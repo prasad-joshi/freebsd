@@ -1,5 +1,4 @@
 #include <stdint.h>
-#include <stdlib.h>
 #include <inttypes.h>
 #include <sys/queue.h>
 #include "bootenv.h"
@@ -138,62 +137,47 @@ bootenv_print(boot_conf_t *conf)
 	}
 }
 
-static int
-bootenv_search(boot_conf_t *conf, boot_env_t *cmp_be, sort_type_t type,
-		boot_env_t **bepp)
+int
+bootenv_search_objnum(boot_conf_t *conf, uint64_t objnum, boot_env_t **bepp)
 {
-	becmp_t    cmp_fn;
 	boot_env_t *b;
-	int        rc;
-
-	switch (conf->sort) {
-	default:
-	case SORT_TIMESTAMP:
-		cmp_fn = cmp_timestamp;
-		break;
-	case SORT_OBJNUM:
-		cmp_fn = cmp_objnum;
-		break;
-	case SORT_NAME:
-		cmp_fn = cmp_name;
-		break;
-	}
 
 	TAILQ_FOREACH(b, &conf->head, be_list) {
-		rc = cmp_fn(b, cmp_be);
-		if (rc == 0) {
+		if (b->objnum == objnum) {
 			*bepp = b;
 			return (0);
 		}
 	}
 
-	*bepp = NULL;
 	return (-1);
 }
 
 int
-bootenv_search_objnum(boot_conf_t *conf, uint64_t objnum, boot_env_t **bepp)
+bootenv_search_name(boot_conf_t *conf, const char *name, boot_env_t **bepp)
 {
-	boot_env_t t;
-	t.objnum = objnum;
+	boot_env_t *b;
 
-	return (bootenv_search(conf, &t, SORT_OBJNUM, bepp));
+	TAILQ_FOREACH(b, &conf->head, be_list) {
+		if (strncmp(b->name, name, sizeof(b->name)) == 0) {
+			*bepp = b;
+			return (0);
+		}
+	}
+
+	return (-1);
 }
 
 int
-bootenv_search_name(boot_conf_t *conf, char *name, boot_env_t *bepp)
+bootenv_search_timestamp(boot_conf_t *conf, uint64_t timestamp, boot_env_t **bepp)
 {
-	boot_env_t t;
-	strncpy(t.name, name, sizeof(t.name));
+	boot_env_t *b;
 
-	return (bootenv_search(conf, &t, SORT_NAME, bepp));
-}
+	TAILQ_FOREACH(b, &conf->head, be_list) {
+		if (b->timestamp == timestamp) {
+			*bepp = b;
+			return (0);
+		}
+	}
 
-int
-bootenv_search_timestamp(boot_conf_t *conf, uint64_t timestamp, boot_env_t *bepp)
-{
-	boot_env_t t;
-	t.timestamp = timestamp;
-
-	return (bootenv_search(conf, &t, SORT_TIMESTAMP, bepp));
+	return (-1);
 }

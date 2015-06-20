@@ -31,6 +31,6 @@ int bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp,
 int bootenv_add(boot_conf_t *conf, boot_env_t *be);
 void bootenv_print(boot_conf_t *conf);
 int bootenv_search_objnum(boot_conf_t *conf, uint64_t objnum, boot_env_t **bepp);
-int bootenv_search_name(boot_conf_t *conf, char *name, boot_env_t *bepp);
-int bootenv_search_timestamp(boot_conf_t *conf, uint64_t timestamp, boot_env_t *bepp);
+int bootenv_search_name(boot_conf_t *conf, const char *name, boot_env_t **bepp);
+int bootenv_search_timestamp(boot_conf_t *conf, uint64_t timestamp, boot_env_t **bepp);
 #endif
