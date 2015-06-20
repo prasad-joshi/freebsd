@@ -148,6 +148,64 @@ strdup(const char *s)
 	return p;
 }
 
+#define isspace(c) \
+        ((c) == ' ' || (c) == '\t' || (c) == '\n' || \
+	(c) == '\r' || (c) == '\f' || (c) == '\v')
+
+#define isdigit(c) ((c) >= '0' && (c) <= '9')
+
+static long int
+strtol(const char *nptr, char **endptr, int base)
+{
+	const char *s;
+	char       c;
+	int        neg;
+	long int   rc;
+	int        d;
+
+	s   = nptr;
+	neg = 0;
+
+	while (isspace(*s)) {
+		s++;
+	}
+
+	c = *s;
+	if (c == '-') {
+		neg = 1;
+		s++;
+	} else if (c == '+') {
+		s++;
+	}
+
+	if (base) {
+		base = 10;
+	} else {
+		base = 10;
+	}
+
+	rc = 0;
+	c  = *s;
+	while (c != 0) {
+		if (!isdigit(c)) {
+			break;
+		}
+
+		d  = c - '0';
+		rc = (rc * 10) + d;
+		c  = *++s;
+	}
+
+	if (neg) {
+		rc = -rc;
+	}
+
+	if (endptr != NULL) {
+		*endptr = s;
+	}
+	return (rc);
+}
+
 #include "zfsimpl.c"
 
 /*
@@ -440,8 +498,16 @@ main(void)
     dnode_phys_t dn;
     off_t off;
     struct dsk *dsk;
+    boot_conf_t be_conf;
+    boot_env_t  *be;
+    char        *opt_str[32];
+    uint32_t    option;
+    uint64_t    rootobj;
+    int         rc;
 
     dmadat = (void *)(roundup2(__base + (int32_t)&_end, 0x10000) - __base);
+
+    bootenv_init(&be_conf, SORT_NAME);
 
     bios_getmem();
 
@@ -525,7 +591,29 @@ main(void)
     primary_spa = spa;
     primary_vdev = spa_get_primary_vdev(spa);
 
-    if (zfs_spa_init(spa) != 0 || zfs_mount(spa, 0, &zfsmount) != 0) {
+    if (zfs_spa_init(spa) != 0) {
+	printf("%s: failed initialize default pool %s]n", BOOTPROG, spa->spa_name);
+	autoboot = 0;
+    }
+
+    rootobj = 0;
+
+    /* find list of BE names */
+    zfs_get_bes(spa, &be_conf);
+
+    /* print BEs */
+    bootenv_print(&be_conf);
+
+    printf("Enter object number to boot from: ");
+    getstr(opt_str, sizeof(opt_str));
+    option = strtol(opt_str, NULL, 10);
+
+    rc = bootenv_search_objnum(&be_conf, option, &be);
+    if (rc == 0) {
+    	rootobj = be->objnum;
+    }
+
+    if (autoboot == 0 || zfs_mount(spa, rootobj, &zfsmount) != 0) {
 	printf("%s: failed to mount default pool %s\n",
 	    BOOTPROG, spa->spa_name);
 	autoboot = 0;
@@ -556,6 +644,10 @@ main(void)
 
     if (autoboot && !*kname) {
 	memcpy(kname, PATH_BOOT3, sizeof(PATH_BOOT3));
+
+   	zfs_rlookup(spa, zfsmount.rootobj, rootname);
+    	printf("\nStarting: %s/%s:%s", spa->spa_name, rootname, kname);
+
 	if (!keyhit(3)) {
 	    load();
 	    memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));

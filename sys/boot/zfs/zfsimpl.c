@@ -36,7 +36,7 @@ __FBSDID("$FreeBSD$");
 
 #include "zfsimpl.h"
 #include "zfssubr.c"
-
+#include "bootenv.c"
 
 struct zfsmount {
 	const spa_t	*spa;
@@ -1473,6 +1473,25 @@ zap_lookup(const spa_t *spa, const dnode_phys_t *dnode, const char *name, uint64
  * the directory contents.
  */
 static int
+mzap_get_entry(const dnode_phys_t *dnode, int entry, mzap_ent_phys_t **mzepp)
+{
+	uint64_t          size;
+	int               chunks;
+	const mzap_phys_t *mz;
+
+	size   = dnode->dn_datablkszsec * 512;
+	chunks = size / MZAP_ENT_LEN - 1;
+
+	if (entry >= chunks) {
+		return (-1);
+	}
+
+	mz     = (const mzap_phys_t *) zap_scratch;
+	*mzepp = &mz->mz_chunk[entry];
+	return (0);
+}
+
+static int
 mzap_list(const dnode_phys_t *dnode)
 {
 	const mzap_phys_t *mz;
@@ -1576,16 +1595,29 @@ fzap_list(const spa_t *spa, const dnode_phys_t *dnode)
 /*
  * List a zap directory.
  */
+
+static int
+zap_get_type(const spa_t *spa, const dnode_phys_t *dnode, uint64_t *zap_type)
+{
+	size_t size = dnode->dn_datablkszsec * 512;
+
+	if (dnode_read(spa, dnode, 0, zap_scratch, size)) {
+		return (EIO);
+	}
+
+	zap_type = *(uint64_t *) zap_scratch;
+	return (0);
+}
+
 static int
 zap_list(const spa_t *spa, const dnode_phys_t *dnode)
 {
 	uint64_t zap_type;
-	size_t size = dnode->dn_datablkszsec * 512;
 
-	if (dnode_read(spa, dnode, 0, zap_scratch, size))
+	if (zap_get_type(spa, dnode, &zap_type) != 0) {
 		return (EIO);
+	}
 
-	zap_type = *(uint64_t *) zap_scratch;
 	if (zap_type == ZBT_MICRO)
 		return mzap_list(dnode);
 	else
@@ -1859,6 +1891,130 @@ zfs_list_dataset(const spa_t *spa, uint64_t objnum/*, int pos, char *entry*/)
 	return (zap_list(spa, &child_dir_zap) != 0);
 }
 #endif
+
+static int
+zfs_get_child_zap(const spa_t *spa, uint64_t objnum, dnode_phys_t *zap, uint64_t *zap_type)
+{
+	uint64_t dir_obj, child_dir_zapobj;
+	dnode_phys_t dir, dataset;
+	dsl_dataset_phys_t *ds;
+	dsl_dir_phys_t *dd;
+
+	if (objset_get_dnode(spa, &spa->spa_mos, objnum, &dataset)) {
+		printf("ZFS: can't find dataset %ju\n", (uintmax_t)objnum);
+		return (EIO);
+	}
+	ds = (dsl_dataset_phys_t *) &dataset.dn_bonus;
+	dir_obj = ds->ds_dir_obj;
+
+	if (objset_get_dnode(spa, &spa->spa_mos, dir_obj, &dir)) {
+		printf("ZFS: can't find dirobj %ju\n", (uintmax_t)dir_obj);
+		return (EIO);
+	}
+	dd = (dsl_dir_phys_t *)&dir.dn_bonus;
+
+	child_dir_zapobj = dd->dd_child_dir_zapobj;
+	if (objset_get_dnode(spa, &spa->spa_mos, child_dir_zapobj, zap) != 0) {
+		printf("ZFS: can't find child zap %ju\n", (uintmax_t)dir_obj);
+		return (EIO);
+	}
+
+	return (zap_get_type(spa, zap, zap_type));
+}
+
+static int
+zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
+{
+	uint64_t        be_active; /* object number of active be */
+	uint64_t        objnum;
+	int             rc;
+	dnode_phys_t    child_zap;
+	uint64_t        zap_type;
+	char            be_path[ZFS_MAXNAMELEN];
+	int             spa_len;
+	int             rlen;
+	mzap_ent_phys_t *mze;
+	int             entry;
+	char            *d;
+	uint64_t        be_objnum;
+	int             active;
+	uint64_t        timestamp;
+	boot_env_t      *be;
+
+	rc = zfs_get_root(spa, &be_active);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	rc = zfs_lookup_dataset(spa, "ROOT", &objnum);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	rc = zfs_get_child_zap(spa, objnum, &child_zap, &zap_type);
+	if (rc != 0) {
+		return (rc);
+	}
+
+	spa_len = strlen(spa->spa_name);
+	strncpy(be_path, spa->spa_name, sizeof(be_path));
+	strncat(be_path, "/ROOT/", sizeof(be_path));
+	rlen = strlen(be_path);
+
+	entry = 0;
+	while (1) {
+		be_path[rlen] = 0;
+
+		if (zap_type == ZBT_MICRO) {
+			mze = NULL;
+			rc = mzap_get_entry(&child_zap, entry, &mze);
+			if (rc < 0) {
+				break;
+			}
+
+			if (mze->mze_name[0] == 0) {
+				entry++;
+				continue;
+			}
+			strncat(be_path, mze->mze_name, sizeof(be_path));
+		} else {
+			printf("NOT IMPL YET\n");
+			break;
+		}
+
+		/*
+		 * Assuming spa_name is zroot and BE name default, be_path will
+		 * now contain string 'zroot/ROOT/default'
+		 */
+		d = &be_path[spa_len + 1];
+		rc = zfs_lookup_dataset(spa, d, &be_objnum);
+		if (rc != 0) {
+			break;
+		}
+
+		active = 0;
+		if (be_active == be_objnum) {
+			active = 1;
+		}
+
+		/* TODO: find timestamp */
+		timestamp = 0;
+
+		rc = bootenv_new(be_path, be_objnum, timestamp, active, &be);
+		if (rc != 0) {
+			break;
+		}
+
+		rc = bootenv_add(be_conf, be);
+		if (rc != 0) {
+			break;
+		}
+
+		entry++;
+	}
+
+	return (rc);
+}
 
 /*
  * Find the object set given the object number of its dataset object

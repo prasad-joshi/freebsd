@@ -4,6 +4,7 @@ LIB=		zfsboot
 INTERNALLIB=
 
 SRCS+=		zfs.c
+SRCS+=		bootenv.c
 
 CFLAGS+=	-DBOOTPROG=\"zfsloader\"
 CFLAGS+=	-I${.CURDIR}/../common -I${.CURDIR}/../.. -I.
