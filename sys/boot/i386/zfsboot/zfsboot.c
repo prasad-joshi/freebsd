@@ -148,6 +148,64 @@ strdup(const char *s)
 	return p;
 }
 
+#define isspace(c) \
+        ((c) == ' ' || (c) == '\t' || (c) == '\n' || \
+	(c) == '\r' || (c) == '\f' || (c) == '\v')
+
+#define isdigit(c) ((c) >= '0' && (c) <= '9')
+
+static long int
+strtol(const char *nptr, char **endptr, int base)
+{
+	const char *s;
+	char       c;
+	int        neg;
+	long int   rc;
+	int        d;
+
+	s   = nptr;
+	neg = 0;
+
+	while (isspace(*s)) {
+		s++;
+	}
+
+	c = *s;
+	if (c == '-') {
+		neg = 1;
+		s++;
+	} else if (c == '+') {
+		s++;
+	}
+
+	if (base) {
+		base = 10;
+	} else {
+		base = 10;
+	}
+
+	rc = 0;
+	c  = *s;
+	while (c != 0) {
+		if (!isdigit(c)) {
+			break;
+		}
+
+		d  = c - '0';
+		rc = (rc * 10) + d;
+		c  = *++s;
+	}
+
+	if (neg) {
+		rc = -rc;
+	}
+
+	if (endptr != NULL) {
+		*endptr = s;
+	}
+	return (rc);
+}
+
 #include "zfsimpl.c"
 
 /*
@@ -586,6 +644,10 @@ main(void)
 
     if (autoboot && !*kname) {
 	memcpy(kname, PATH_BOOT3, sizeof(PATH_BOOT3));
+
+   	zfs_rlookup(spa, zfsmount.rootobj, rootname);
+    	printf("\nStarting: %s/%s:%s", spa->spa_name, rootname, kname);
+
 	if (!keyhit(3)) {
 	    load();
 	    memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));
