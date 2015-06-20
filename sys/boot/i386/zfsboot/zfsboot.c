@@ -440,8 +440,16 @@ main(void)
     dnode_phys_t dn;
     off_t off;
     struct dsk *dsk;
+    boot_conf_t be_conf;
+    boot_env_t  *be;
+    char        *opt_str[32];
+    uint32_t    option;
+    uint64_t    rootobj;
+    int         rc;
 
     dmadat = (void *)(roundup2(__base + (int32_t)&_end, 0x10000) - __base);
+
+    bootenv_init(&be_conf, SORT_NAME);
 
     bios_getmem();
 
@@ -525,7 +533,29 @@ main(void)
     primary_spa = spa;
     primary_vdev = spa_get_primary_vdev(spa);
 
-    if (zfs_spa_init(spa) != 0 || zfs_mount(spa, 0, &zfsmount) != 0) {
+    if (zfs_spa_init(spa) != 0) {
+	printf("%s: failed initialize default pool %s]n", BOOTPROG, spa->spa_name);
+	autoboot = 0;
+    }
+
+    rootobj = 0;
+
+    /* find list of BE names */
+    zfs_get_bes(spa, &be_conf);
+
+    /* print BEs */
+    bootenv_print(&be_conf);
+
+    printf("Enter object number to boot from: ");
+    getstr(opt_str, sizeof(opt_str));
+    option = strtol(opt_str, NULL, 10);
+
+    rc = bootenv_search_objnum(&be_conf, option, &be);
+    if (rc == 0) {
+    	rootobj = be->objnum;
+    }
+
+    if (autoboot == 0 || zfs_mount(spa, rootobj, &zfsmount) != 0) {
 	printf("%s: failed to mount default pool %s\n",
 	    BOOTPROG, spa->spa_name);
 	autoboot = 0;
