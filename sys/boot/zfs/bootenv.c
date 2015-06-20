@@ -21,8 +21,6 @@ bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp, int active,
 {
 	boot_env_t *be;
 
-	printf("%s: ==>\n", __func__);
-
 	be = malloc(sizeof(*be));
 
 	strncpy(be->name, name, sizeof(be->name));
@@ -32,7 +30,6 @@ bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp, int active,
 	be->id        = 0;
 	*bepp         = be;
 
-	printf("%s: <==\n", __func__);
 	return (0);
 }
 
