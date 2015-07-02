@@ -1,6 +1,8 @@
+#include <sys/_null.h>
+#include <sys/queue.h>
+
 #include <stdint.h>
 #include <inttypes.h>
-#include <sys/queue.h>
 #include "bootenv.h"
 
 typedef int (*becmp_t) (boot_env_t *be1, boot_env_t *be2);

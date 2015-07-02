@@ -4,6 +4,8 @@
 #include <stdint.h>
 #include <sys/queue.h>
 
+#include "libzfs.h"
+
 typedef enum {
 	SORT_OBJNUM,
 	SORT_TIMESTAMP,
