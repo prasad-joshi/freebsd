@@ -93,6 +93,7 @@ static const unsigned char dev_maj[NDEV] = {30, 4, 2};
 static char cmd[512];
 static char cmddup[512];
 static char kname[1024];
+static char mountfrom[256];
 static char rootname[256];
 static int comspeed = SIOSPD;
 static struct bootinfo bootinfo;
@@ -440,6 +441,8 @@ main(void)
     dnode_phys_t dn;
     off_t off;
     struct dsk *dsk;
+    int l;
+    int sz;
 
     dmadat = (void *)(roundup2(__base + (int32_t)&_end, 0x10000) - __base);
 
@@ -557,6 +560,24 @@ main(void)
     if (autoboot && !*kname) {
 	memcpy(kname, PATH_BOOT3, sizeof(PATH_BOOT3));
 	if (!keyhit(3)) {
+
+	    zfs_rlookup(spa, zfsmount.rootobj, rootname);
+
+	    /* setup mountfrom string */
+	    l = sz = sizeof(mountfrom) - 1;
+	    strncpy(mountfrom, "zfs:", l);
+
+	    l = sz - strlen(mountfrom);
+	    strncat(mountfrom, spa->spa_name, l);
+
+	    l = sz - strlen(mountfrom);
+	    strncat(mountfrom, "/", l);
+
+	    l = sz - strlen(mountfrom);
+	    strncat(mountfrom, rootname, l);
+
+	    printf("\n mountfrom = %s passed to next stage\n", mountfrom);
+
 	    load();
 	    memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));
 	}
@@ -694,6 +715,7 @@ load(void)
     zfsargs.pool = zfsmount.spa->spa_guid;
     zfsargs.root = zfsmount.rootobj;
     zfsargs.primary_pool = primary_spa->spa_guid;
+    zfsargs.mountfrom = VTOP(mountfrom);
     if (primary_vdev != NULL)
 	zfsargs.primary_vdev = primary_vdev->v_guid;
     else
