@@ -434,6 +434,30 @@ trymbr:
     }
 }
 
+static void
+setup_mountfrom(void)
+{
+	int l;
+	int sz;
+
+	zfs_rlookup(spa, zfsmount.rootobj, rootname);
+
+	/* setup mountfrom string */
+	l = sz = sizeof(mountfrom) - 1;
+	strncpy(mountfrom, "zfs:", l);
+
+	l = sz - strlen(mountfrom);
+	strncat(mountfrom, spa->spa_name, l);
+
+	l = sz - strlen(mountfrom);
+	strncat(mountfrom, "/", l);
+
+	l = sz - strlen(mountfrom);
+	strncat(mountfrom, rootname, l);
+
+	printf("\n mountfrom = %s passed to next stage\n", mountfrom);
+}
+
 int
 main(void)
 {
@@ -441,8 +465,6 @@ main(void)
     dnode_phys_t dn;
     off_t off;
     struct dsk *dsk;
-    int l;
-    int sz;
 
     dmadat = (void *)(roundup2(__base + (int32_t)&_end, 0x10000) - __base);
 
@@ -560,24 +582,7 @@ main(void)
     if (autoboot && !*kname) {
 	memcpy(kname, PATH_BOOT3, sizeof(PATH_BOOT3));
 	if (!keyhit(3)) {
-
-	    zfs_rlookup(spa, zfsmount.rootobj, rootname);
-
-	    /* setup mountfrom string */
-	    l = sz = sizeof(mountfrom) - 1;
-	    strncpy(mountfrom, "zfs:", l);
-
-	    l = sz - strlen(mountfrom);
-	    strncat(mountfrom, spa->spa_name, l);
-
-	    l = sz - strlen(mountfrom);
-	    strncat(mountfrom, "/", l);
-
-	    l = sz - strlen(mountfrom);
-	    strncat(mountfrom, rootname, l);
-
-	    printf("\n mountfrom = %s passed to next stage\n", mountfrom);
-
+	    setup_mountfrom();
 	    load();
 	    memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));
 	}
@@ -610,8 +615,10 @@ main(void)
 	autoboot = 0;
 	if (parse())
 	    putchar('\a');
-	else
+	else {
+	    setup_mountfrom();
 	    load();
+	}
     }
 }
 
