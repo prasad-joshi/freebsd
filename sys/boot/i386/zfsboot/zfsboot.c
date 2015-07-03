@@ -723,6 +723,7 @@ load(void)
     zfsargs.root = zfsmount.rootobj;
     zfsargs.primary_pool = primary_spa->spa_guid;
     zfsargs.mountfrom = VTOP(mountfrom);
+    printf("\nVTOP(mountfrom) = %x mountfrom = %x\n", zfsargs.mountfrom, mountfrom);
     if (primary_vdev != NULL)
 	zfsargs.primary_vdev = primary_vdev->v_guid;
     else
