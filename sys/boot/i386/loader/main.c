@@ -61,7 +61,6 @@ static struct bootargs *kargs;
 static u_int32_t	initial_howto;
 static u_int32_t	initial_bootdev;
 static struct bootinfo	*initial_bootinfo;
-static char             *mountfrom;
 
 struct arch_switch	archsw;		/* MI/MD interface boundary */
 
@@ -263,13 +262,10 @@ extract_currdev(void)
 	        }
 	    }
 
-	    if ((kargs->bootflags & KARGS_FLAGS_MOUNTFROM) != 0) {
-	    	mountfrom = PTOV((char *) (zargs + 1));
-		if (mountfrom != (void *) 0) {
-		    /* defensive for now */
-		    mountfrom[100] = 0;
-		    printf("\nset vfs.root.mountfrom = %s\n", mountfrom);
-		}
+	    if (zargs->size > offsetof(struct zfs_boot_args, primary_vdev)) {
+		/* defensive for now */
+		zargs->mountfrom[100] = 0;
+		printf("\nset vfs.root.mountfrom = %s\n", zargs->mountfrom);
 	    }
 	} else {
 	    /* old style zfsboot block */
