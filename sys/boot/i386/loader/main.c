@@ -249,16 +249,23 @@ extract_currdev(void)
 	if ((kargs->bootflags & KARGS_FLAGS_EXTARG) != 0)
 	    zargs = (struct zfs_boot_args *)(kargs + 1);
 
-	if (zargs != NULL &&
-	    zargs->size >= offsetof(struct zfs_boot_args, primary_pool)) {
-	    /* sufficient data is provided */
-	    new_currdev.d_kind.zfs.pool_guid = zargs->pool;
-	    new_currdev.d_kind.zfs.root_guid = zargs->root;
-	    if (zargs->size >= sizeof(*zargs) && zargs->primary_vdev != 0) {
-		sprintf(buf, "%llu", zargs->primary_pool);
-		setenv("vfs.zfs.boot.primary_pool", buf, 1);
-		sprintf(buf, "%llu", zargs->primary_vdev);
-		setenv("vfs.zfs.boot.primary_vdev", buf, 1);
+	if (zargs != NULL) {
+	    if (zargs->size >= offsetof(struct zfs_boot_args, primary_pool)) {
+	        /* sufficient data is provided */
+	        new_currdev.d_kind.zfs.pool_guid = zargs->pool;
+	        new_currdev.d_kind.zfs.root_guid = zargs->root;
+	        if (zargs->size >= sizeof(*zargs) && zargs->primary_vdev != 0) {
+	            sprintf(buf, "%llu", zargs->primary_pool);
+	            setenv("vfs.zfs.boot.primary_pool", buf, 1);
+	            sprintf(buf, "%llu", zargs->primary_vdev);
+	            setenv("vfs.zfs.boot.primary_vdev", buf, 1);
+	        }
+	    }
+
+	    if (zargs->size > offsetof(struct zfs_boot_args, primary_vdev)) {
+	        zargs->mountfrom[sizeof(zargs->mountfrom)-1] = 0; /* defensive */
+		printf("\nsetting vfs.root.mountfrom = %s\n", zargs->mountfrom);
+		setenv("vfs.root.mountfrom", zargs->mountfrom, 1);
 	    }
 	} else {
 	    /* old style zfsboot block */

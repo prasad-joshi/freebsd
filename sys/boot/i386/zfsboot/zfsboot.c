@@ -94,6 +94,7 @@ static char cmd[512];
 static char cmddup[512];
 static char kname[1024];
 static char rootname[256];
+static char mountfrom[256];
 static int comspeed = SIOSPD;
 static struct bootinfo bootinfo;
 static uint32_t bootdev;
@@ -491,6 +492,30 @@ trymbr:
     }
 }
 
+static void
+setup_mountfrom(void)
+{
+	int l;
+	int sz;
+
+	zfs_rlookup(spa, zfsmount.rootobj, rootname);
+
+	/* setup mountfrom string */
+	l = sz = sizeof(mountfrom) - 1;
+	strncpy(mountfrom, "zfs:", l);
+
+	l = sz - strlen(mountfrom);
+	strncat(mountfrom, spa->spa_name, l);
+
+	l = sz - strlen(mountfrom);
+	strncat(mountfrom, "/", l);
+
+	l = sz - strlen(mountfrom);
+	strncat(mountfrom, rootname, l);
+
+	printf("\n mountfrom = %s passed to next stage\n", mountfrom);
+}
+
 int
 main(void)
 {
@@ -623,6 +648,10 @@ main(void)
 	zfs_read(spa, &dn, &off, cmd, sizeof(cmd));
     }
 
+    setup_mountfrom();
+    printf("\nStarting: %s/%s:%s\n", spa->spa_name, rootname, kname);
+    printf("mountfrom = zfs:%s/%s\n", spa->spa_name, rootname);
+
     if (*cmd) {
 	/*
 	 * Note that parse() is destructive to cmd[] and we also want
@@ -645,13 +674,8 @@ main(void)
     if (autoboot && !*kname) {
 	memcpy(kname, PATH_BOOT3, sizeof(PATH_BOOT3));
 
-   	zfs_rlookup(spa, zfsmount.rootobj, rootname);
-    	printf("\nStarting: %s/%s:%s", spa->spa_name, rootname, kname);
-
-	if (!keyhit(3)) {
-	    load();
-	    memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));
-	}
+	load();
+	memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));
     }
 
     /* Present the user with the boot2 prompt. */
@@ -786,6 +810,8 @@ load(void)
     zfsargs.pool = zfsmount.spa->spa_guid;
     zfsargs.root = zfsmount.rootobj;
     zfsargs.primary_pool = primary_spa->spa_guid;
+    strncpy(zfsargs.mountfrom, mountfrom, sizeof(zfsargs.mountfrom) - 1);
+    zfsargs.mountfrom[sizeof(zfsargs.mountfrom) - 1] = 0;
     if (primary_vdev != NULL)
 	zfsargs.primary_vdev = primary_vdev->v_guid;
     else
