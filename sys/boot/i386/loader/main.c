@@ -263,9 +263,9 @@ extract_currdev(void)
 	    }
 
 	    if (zargs->size > offsetof(struct zfs_boot_args, primary_vdev)) {
-		/* defensive for now */
-		zargs->mountfrom[100] = 0;
-		printf("\nset vfs.root.mountfrom = %s\n", zargs->mountfrom);
+	        zargs->mountfrom[sizeof(zargs->mountfrom)-1] = 0; /* defensive */
+		printf("\nsetting vfs.root.mountfrom = %s\n", zargs->mountfrom);
+		setenv("vfs.root.mountfrom", zargs->mountfrom, 1);
 	    }
 	} else {
 	    /* old style zfsboot block */
