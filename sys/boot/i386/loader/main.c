@@ -263,9 +263,8 @@ extract_currdev(void)
 	        }
 	    }
 
-	    if (zargs->size > offsetof(struct zfs_boot_args, primary_vdev)) {
-		printf("\nPTOV(zargs->mountfrom) = %p zargs->mountfrom = %x\n", PTOV(zargs->mountfrom), zargs->mountfrom);
-	        mountfrom = PTOV(zargs->mountfrom);
+	    if ((kargs->bootflags & KARGS_FLAGS_MOUNTFROM) != 0) {
+	    	mountfrom = PTOV((char *) (zargs + 1));
 		if (mountfrom != (void *) 0) {
 		    /* defensive for now */
 		    mountfrom[100] = 0;

@@ -722,19 +722,18 @@ load(void)
     zfsargs.pool = zfsmount.spa->spa_guid;
     zfsargs.root = zfsmount.rootobj;
     zfsargs.primary_pool = primary_spa->spa_guid;
-    zfsargs.mountfrom = VTOP(mountfrom);
-    printf("\nVTOP(mountfrom) = %x mountfrom = %x\n", zfsargs.mountfrom, mountfrom);
+    printf("\nVTOP(mountfrom) = %x mountfrom = %x\n", VTOP(zfsargs.mountfrom), &mountfrom);
     if (primary_vdev != NULL)
 	zfsargs.primary_vdev = primary_vdev->v_guid;
     else
 	printf("failed to detect primary vdev\n");
     __exec((caddr_t)addr, RB_BOOTINFO | (opts & RBX_MASK),
 	   bootdev,
-	   KARGS_FLAGS_ZFS | KARGS_FLAGS_EXTARG,
+	   KARGS_FLAGS_ZFS | KARGS_FLAGS_EXTARG | KARGS_FLAGS_MOUNTFROM,
 	   (uint32_t) spa->spa_guid,
 	   (uint32_t) (spa->spa_guid >> 32),
 	   VTOP(&bootinfo),
-	   zfsargs);
+	   zfsargs, VTOP(mountfrom));
 }
 
 static int
