@@ -1812,7 +1812,8 @@ zfs_rlookup(const spa_t *spa, uint64_t objnum, char *result)
 }
 
 static int
-zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum)
+zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum,
+		uint64_t *timestamp)
 {
 	char element[256];
 	uint64_t dir_obj, child_dir_zapobj;
@@ -1857,6 +1858,9 @@ zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum)
 	}
 
 	*objnum = dd->dd_head_dataset_obj;
+	if (timestamp != (void *) 0) {
+		*timestamp = dd->dd_creation_time;
+	}
 	return (0);
 }
 
@@ -1946,7 +1950,7 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 		return (rc);
 	}
 
-	rc = zfs_lookup_dataset(spa, "ROOT", &objnum);
+	rc = zfs_lookup_dataset(spa, "ROOT", &objnum, (void *) 0);
 	if (rc != 0) {
 		return (rc);
 	}
@@ -1986,8 +1990,9 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 		 * Assuming spa_name is zroot and BE name default, be_path will
 		 * now contain string 'zroot/ROOT/default'
 		 */
+		timestamp = 0;
 		d = &be_path[spa_len + 1];
-		rc = zfs_lookup_dataset(spa, d, &be_objnum);
+		rc = zfs_lookup_dataset(spa, d, &be_objnum, &timestamp);
 		if (rc != 0) {
 			break;
 		}
@@ -1996,9 +2001,6 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 		if (be_active == be_objnum) {
 			active = 1;
 		}
-
-		/* TODO: find timestamp */
-		timestamp = 0;
 
 		rc = bootenv_new(be_path, be_objnum, timestamp, active, &be);
 		if (rc != 0) {

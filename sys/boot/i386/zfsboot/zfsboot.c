@@ -532,7 +532,7 @@ main(void)
 
     dmadat = (void *)(roundup2(__base + (int32_t)&_end, 0x10000) - __base);
 
-    bootenv_init(&be_conf, SORT_NAME);
+    bootenv_init(&be_conf, SORT_TIMESTAMP);
 
     bios_getmem();
 
@@ -846,7 +846,7 @@ zfs_mount_ds(char *dsname)
 
     newroot = 0;
     if (q) {
-	if (zfs_lookup_dataset(newspa, q, &newroot)) {
+	if (zfs_lookup_dataset(newspa, q, &newroot, (void *) 0)) {
 	    printf("\nCan't find dataset %s in ZFS pool %s\n",
 		    q, newspa->spa_name);
 	    return -1;
