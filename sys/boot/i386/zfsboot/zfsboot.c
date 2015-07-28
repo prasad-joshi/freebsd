@@ -42,6 +42,7 @@ __FBSDID("$FreeBSD$");
 #include "util.h"
 #include "cons.h"
 #include "bootargs.h"
+#include "boot_menu.h"
 
 #include "libzfs.h"
 
@@ -62,6 +63,7 @@ __FBSDID("$FreeBSD$");
 #define TYPE_DA		1
 #define TYPE_MAXHARD	TYPE_DA
 #define TYPE_FD		2
+#define MAX_COLS        70
 
 extern uint32_t _end;
 
@@ -113,6 +115,7 @@ static struct bios_smap smap;
 
 static char *heap_next;
 static char *heap_end;
+static char *heap_saved;
 
 /* Buffers that must not span a 64k boundary. */
 #define READ_BUF_SIZE	8192
@@ -149,6 +152,7 @@ strdup(const char *s)
 	return p;
 }
 
+#if 0
 #define isspace(c) \
         ((c) == ' ' || (c) == '\t' || (c) == '\n' || \
 	(c) == '\r' || (c) == '\f' || (c) == '\v')
@@ -206,8 +210,10 @@ strtol(const char *nptr, char **endptr, int base)
 	}
 	return (rc);
 }
+#endif
 
 #include "zfsimpl.c"
+#include "boot_menu.c"
 
 /*
  * Read from a dnode (which must be from a ZPL filesystem).
@@ -525,14 +531,15 @@ main(void)
     struct dsk *dsk;
     boot_conf_t be_conf;
     boot_env_t  *be;
-    char        *opt_str[32];
-    uint32_t    option;
+    be_console_t console;
     uint64_t    rootobj;
+    int         cur_order;
+    int         cur_key;
+    int         order;
+    int         key;
     int         rc;
 
     dmadat = (void *)(roundup2(__base + (int32_t)&_end, 0x10000) - __base);
-
-    bootenv_init(&be_conf, SORT_TIMESTAMP);
 
     bios_getmem();
 
@@ -616,29 +623,7 @@ main(void)
     primary_spa = spa;
     primary_vdev = spa_get_primary_vdev(spa);
 
-    if (zfs_spa_init(spa) != 0) {
-	printf("%s: failed initialize default pool %s]n", BOOTPROG, spa->spa_name);
-	autoboot = 0;
-    }
-
-    rootobj = 0;
-
-    /* find list of BE names */
-    zfs_get_bes(spa, &be_conf);
-
-    /* print BEs */
-    bootenv_print(&be_conf);
-
-    printf("Enter object number to boot from: ");
-    getstr(opt_str, sizeof(opt_str));
-    option = strtol(opt_str, NULL, 10);
-
-    rc = bootenv_search_objnum(&be_conf, option, &be);
-    if (rc == 0) {
-    	rootobj = be->objnum;
-    }
-
-    if (autoboot == 0 || zfs_mount(spa, rootobj, &zfsmount) != 0) {
+    if (zfs_spa_init(spa) != 0 || zfs_mount(spa, 0, &zfsmount) != 0) {
 	printf("%s: failed to mount default pool %s\n",
 	    BOOTPROG, spa->spa_name);
 	autoboot = 0;
@@ -647,10 +632,6 @@ main(void)
 	off = 0;
 	zfs_read(spa, &dn, &off, cmd, sizeof(cmd));
     }
-
-    setup_mountfrom();
-    printf("\nStarting: %s/%s:%s\n", spa->spa_name, rootname, kname);
-    printf("mountfrom = zfs:%s/%s\n", spa->spa_name, rootname);
 
     if (*cmd) {
 	/*
@@ -673,41 +654,84 @@ main(void)
 
     if (autoboot && !*kname) {
 	memcpy(kname, PATH_BOOT3, sizeof(PATH_BOOT3));
-
-	load();
-	memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));
+	if (!keyhit(3)) {
+            setup_mountfrom();
+	    load();
+	    memcpy(kname, PATH_KERNEL, sizeof(PATH_KERNEL));
+	}
     }
 
     /* Present the user with the boot2 prompt. */
-
-    for (;;) {
-	if (!autoboot || !OPT_CHECK(RBX_QUIET)) {
-	    printf("\nFreeBSD/x86 boot\n");
-	    if (zfs_rlookup(spa, zfsmount.rootobj, rootname) != 0)
-		printf("Default: %s/<0x%llx>:%s\n"
-		       "boot: ",
-		       spa->spa_name, zfsmount.rootobj, kname);
-	    else if (rootname[0] != '\0')
-		printf("Default: %s/%s:%s\n"
-		       "boot: ",
-		       spa->spa_name, rootname, kname);
-	    else
-		printf("Default: %s:%s\n"
-		       "boot: ",
-		       spa->spa_name, kname);
-	}
-	if (ioctrl & IO_SERIAL)
-	    sio_flush();
-	if (!autoboot || keyhit(5))
-	    getstr(cmd, sizeof(cmd));
-	else if (!autoboot || !OPT_CHECK(RBX_QUIET))
-	    putchar('\n');
-	autoboot = 0;
-	if (parse())
-	    putchar('\a');
-	else
-	    load();
+    rc = be_console_init(&console, 2, 5, 10, MAX_COLS - 5);
+    if (rc < 0) {
+        printf("Initializing console failed.\n");
+        for (;;);
     }
+
+    heap_saved = heap_next;
+    cur_key    = SORT_TIMESTAMP;
+    cur_order  = SORT_ASCENDING;
+    for (;;) {
+#if 1
+        /*
+         * no free() to deallocate memory - restore next allocation pointer
+         * to initial value
+         */
+        heap_next = heap_saved;
+        rootobj   = 0;
+        rc = bootenv_init(&be_conf, cur_key, cur_order);
+        if (rc < 0) {
+            printf("Initializing bootenv list failed.\n");
+            for (;;);
+        }
+
+        /* find list of BE names */
+        zfs_get_bes(spa, &be_conf);
+
+        be    = NULL;
+        order = 0;
+        key   = 0;
+        rc    = be_menu_select(&console, &be_conf, &be, &order, &key);
+        if (rc < 0) {
+            continue;
+        }
+
+        if (be != NULL) {
+            rootobj = be->objnum;
+            rc = zfs_mount(spa, rootobj, &zfsmount);
+            if (rc != 0) {
+                continue;
+            }
+
+            setup_mountfrom();
+            load();
+        } else if (order == 1) {
+            switch (cur_order) {
+            case SORT_ASCENDING:
+                cur_order = SORT_DESCENDING;
+                break;
+            case SORT_DESCENDING:
+                cur_order = SORT_ASCENDING;
+                break;
+            }
+        } else if (key == 1) {
+            switch (cur_key) {
+            case SORT_TIMESTAMP:
+                cur_key = SORT_OBJNUM;
+                break;
+            case SORT_OBJNUM:
+                cur_key = SORT_NAME;
+                break;
+            case SORT_NAME:
+                cur_key = SORT_TIMESTAMP;
+                break;
+            }
+        }
+#else
+/* TODO: handle RBX_QUIET */
+#endif
+    }
+
 }
 
 /* XXX - Needed for btxld to link the boot2 binary; do not remove. */

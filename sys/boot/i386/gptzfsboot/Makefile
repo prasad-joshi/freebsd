@@ -67,7 +67,8 @@ gptzfsboot.bin: gptzfsboot.out
 gptzfsboot.out: ${BTXCRT} zfsboot.o sio.o gpt.o drv.o cons.o util.o
 	${LD} ${LD_FLAGS} -Ttext ${ORG2} -o ${.TARGET} ${.ALLSRC} ${LIBSTAND}
 
-zfsboot.o: ${.CURDIR}/../../zfs/zfsimpl.c ${.CURDIR}/../../zfs/bootenv.c
+zfsboot.o: 	${.CURDIR}/../../zfs/zfsimpl.c ${.CURDIR}/../../zfs/bootenv.c \
+		${.CURDIR}/../../zfs/boot_menu.c
 
 .if ${MACHINE_CPUARCH} == "amd64"
 beforedepend zfsboot.o: machine

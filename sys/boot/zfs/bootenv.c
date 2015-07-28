@@ -8,10 +8,11 @@
 typedef int (*becmp_t) (boot_env_t *be1, boot_env_t *be2);
 
 int
-bootenv_init(boot_conf_t *conf, sort_type_t sort)
+bootenv_init(boot_conf_t *conf, sort_key_t key, sort_order_t order)
 {
 	TAILQ_INIT(&conf->head);
-	conf->sort  = sort;
+	conf->key   = key;
+	conf->order = order;
 	conf->count = 0;
 	return 0;
 }
@@ -21,15 +22,18 @@ bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp, int active,
 		boot_env_t **bepp)
 {
 	boot_env_t *be;
+	uint32_t   ns;
 
 	be = malloc(sizeof(*be));
 
-	strncpy(be->name, name, sizeof(be->name));
-	be->objnum    = objnum;
-	be->timestamp = timestamp;
-	be->active    = active;
-	be->id        = 0;
-	*bepp         = be;
+	ns = sizeof(be->name);
+	strncpy(be->name, name, ns);
+	be->name[ns - 1] = 0;
+	be->objnum       = objnum;
+	be->timestamp    = timestamp;
+	be->active       = active;
+	be->id           = 0;
+	*bepp            = be;
 
 	return (0);
 }
@@ -73,13 +77,28 @@ bootenv_insert(boot_conf_t *conf, boot_env_t *be, becmp_t func)
 	int        inserted;
 
 	inserted = 0;
-	TAILQ_FOREACH_SAFE(b, &conf->head, be_list, tmp) {
-		rc = func(b, be);
-		if (rc > 0) {
-			TAILQ_INSERT_BEFORE(b, be, be_list);
-			inserted = 1;
-			break;
+	switch (conf->order) {
+	case SORT_ASCENDING:
+		TAILQ_FOREACH_SAFE(b, &conf->head, be_list, tmp) {
+			rc = func(b, be);
+			if (rc > 0) {
+				TAILQ_INSERT_BEFORE(b, be, be_list);
+				inserted = 1;
+				break;
+			}
 		}
+
+		break;
+	case SORT_DESCENDING:
+		TAILQ_FOREACH_SAFE(b, &conf->head, be_list, tmp) {
+			rc = func(b, be);
+			if (rc < 0) {
+				TAILQ_INSERT_BEFORE(b, be, be_list);
+				inserted = 1;
+				break;
+			}
+		}
+		break;
 	}
 
 	if (inserted == 0) {
@@ -95,7 +114,7 @@ bootenv_add(boot_conf_t *conf, boot_env_t *be)
 	becmp_t cmp_fn;
 	int     rc;
 
-	switch (conf->sort) {
+	switch (conf->key) {
 	default:
 	case SORT_TIMESTAMP:
 		cmp_fn = cmp_timestamp;
@@ -117,8 +136,8 @@ bootenv_add(boot_conf_t *conf, boot_env_t *be)
 	return (rc);
 }
 
-static void
-be_print(boot_env_t *be)
+void
+bootenv_string(boot_env_t *be, char *str, uint32_t size)
 {
 	char active;
 
@@ -126,7 +145,18 @@ be_print(boot_env_t *be)
 	if (be->active) {
 		active = '*';
 	}
-	printf("%s (%"PRIu64") (%"PRIu64") %c\n", be->name, be->objnum, be->timestamp, active);
+
+	snprintf(str, size-1, "%s (%"PRIu64") (%"PRIu64") %c\n", be->name,
+		be->objnum, be->timestamp, active);
+}
+
+static void
+be_print(boot_env_t *be)
+{
+	char str[512];
+
+	bootenv_string(be, str, sizeof(str));
+	printf("%s", str);
 }
 
 void
