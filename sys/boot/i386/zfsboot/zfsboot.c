@@ -501,8 +501,10 @@ trymbr:
 static void
 setup_mountfrom(void)
 {
-	int l;
-	int sz;
+	uint32_t l;
+	size_t   sz;
+
+	memset(mountfrom, 0, sizeof(mountfrom));
 
 	zfs_rlookup(spa, zfsmount.rootobj, rootname);
 
@@ -518,8 +520,6 @@ setup_mountfrom(void)
 
 	l = sz - strlen(mountfrom);
 	strncat(mountfrom, rootname, l);
-
-	printf("\n mountfrom = %s passed to next stage\n", mountfrom);
 }
 
 int
