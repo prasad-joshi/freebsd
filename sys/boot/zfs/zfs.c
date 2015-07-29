@@ -37,6 +37,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/time.h>
 #include <sys/queue.h>
+#include <sys/_null.h>
 #include <part.h>
 #include <stddef.h>
 #include <stdarg.h>
@@ -617,7 +618,7 @@ zfs_parsedev(struct zfs_devdesc *dev, const char *devspec, const char **path)
 	if (!spa)
 		return (ENXIO);
 	dev->pool_guid = spa->spa_guid;
-	rv = zfs_lookup_dataset(spa, rootname, &dev->root_guid, (void *) 0);
+	rv = zfs_lookup_dataset(spa, rootname, &dev->root_guid, NULL);
 	if (rv != 0)
 		return (rv);
 	if (path != NULL)
@@ -688,7 +689,7 @@ zfs_list(const char *name)
 	spa = spa_find_by_name(poolname);
 	if (!spa)
 		return (ENXIO);
-	rv = zfs_lookup_dataset(spa, dsname, &objid, (void *) 0);
+	rv = zfs_lookup_dataset(spa, dsname, &objid, NULL);
 	if (rv != 0)
 		return (rv);
 	rv = zfs_list_dataset(spa, objid);

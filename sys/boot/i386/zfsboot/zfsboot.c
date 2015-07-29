@@ -19,6 +19,7 @@ __FBSDID("$FreeBSD$");
 #include <sys/param.h>
 #include <sys/errno.h>
 #include <sys/diskmbr.h>
+#include <sys/_null.h>
 #ifdef GPT
 #include <sys/gpt.h>
 #endif
@@ -501,25 +502,11 @@ trymbr:
 static void
 setup_mountfrom(void)
 {
-	uint32_t l;
-	size_t   sz;
-
-	memset(mountfrom, 0, sizeof(mountfrom));
-
 	zfs_rlookup(spa, zfsmount.rootobj, rootname);
 
 	/* setup mountfrom string */
-	l = sz = sizeof(mountfrom) - 1;
-	strncpy(mountfrom, "zfs:", l);
-
-	l = sz - strlen(mountfrom);
-	strncat(mountfrom, spa->spa_name, l);
-
-	l = sz - strlen(mountfrom);
-	strncat(mountfrom, "/", l);
-
-	l = sz - strlen(mountfrom);
-	strncat(mountfrom, rootname, l);
+	snprintf(mountfrom, sizeof(mountfrom), "zfs:%s/%s", spa->spa_name,
+			rootname);
 }
 
 int
@@ -870,7 +857,7 @@ zfs_mount_ds(char *dsname)
 
     newroot = 0;
     if (q) {
-	if (zfs_lookup_dataset(newspa, q, &newroot, (void *) 0)) {
+	if (zfs_lookup_dataset(newspa, q, &newroot, NULL)) {
 	    printf("\nCan't find dataset %s in ZFS pool %s\n",
 		    q, newspa->spa_name);
 	    return -1;

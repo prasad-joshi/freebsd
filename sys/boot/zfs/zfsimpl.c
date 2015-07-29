@@ -33,6 +33,7 @@ __FBSDID("$FreeBSD$");
 
 #include <sys/stat.h>
 #include <sys/stdint.h>
+#include <sys/_null.h>
 
 #include "zfsimpl.h"
 #include "zfssubr.c"
@@ -1950,7 +1951,7 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 		return (rc);
 	}
 
-	rc = zfs_lookup_dataset(spa, "ROOT", &objnum, (void *) 0);
+	rc = zfs_lookup_dataset(spa, "ROOT", &objnum, NULL);
 	if (rc != 0) {
 		return (rc);
 	}
