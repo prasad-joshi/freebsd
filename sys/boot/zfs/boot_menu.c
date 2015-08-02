@@ -111,10 +111,20 @@ draw_box(be_console_t *cons)
 }
 
 static key_event_t
-get_key_event(void)
+get_key_event(be_console_t *cons, int timeout)
 {
 	int rc;
 
+	if (cons->timeout >= 0) {
+		rc = keyhit(timeout);
+
+		if (rc == 0) {
+			/* timed out */
+			return TIMEOUT;
+		}
+	}
+
+	/* read key scancode */
 	rc = xgetc(0);
 	switch (rc) {
 	case KEY_ENTER:
@@ -217,10 +227,10 @@ struct help_msg {
 };
 
 static void
-be_menu_display_help(be_console_t *cons, boot_conf_t *conf, int help)
+be_menu_display_help(be_console_t *cons, boot_conf_t *conf, int help, int timeout)
 {
 	struct help_msg help_msg[] = {
-		{"Default BE marked with '*' at the end", 1},
+		{"Default BE marked with '*' at the end", 0},
 		{"Press 'h' or '?' to display help message", 0},
 		{"Press 'Enter'    to select BE for booting", 1},
 		{"Press 'o'        to change order of sorting", 1},
@@ -278,6 +288,17 @@ be_menu_display_help(be_console_t *cons, boot_conf_t *conf, int help)
 	erase(cons);
 	print_msg(cons, msg, strlen(msg));
 
+	r++;
+	r++;
+	move(cons, r, c);
+	erase(cons);
+	if (cons->timeout >= 0) {
+		memset(msg, 0, sizeof(msg));
+		snprintf(msg, sizeof(msg),
+			"Booting default BE in %d seconds\n", timeout);
+		print_msg(cons, msg, strlen(msg));
+	}
+
 	/* print help message if required */
 	r++;
 	r++;
@@ -305,10 +326,12 @@ be_menu_select(be_console_t *cons, boot_conf_t *conf, boot_env_t **bepp,
 	int        rc;
 	boot_env_t *b;
 	int        cur_active;
+	int        def_be;
 	int        skip;
 	int        be_count;
 	int        be_selected;
 	int        help;
+	int        timeout;
 
 	/* NOTE: conf->count does not start with 0 */
 	be_count   = conf->count;
@@ -321,7 +344,9 @@ be_menu_select(be_console_t *cons, boot_conf_t *conf, boot_env_t **bepp,
 		break;
 	}
 
-	help = 0;
+	def_be  = cur_active;
+	help    = 0;
+	timeout = cons->timeout;
 	while (1) {
 		skip = 0;
 
@@ -330,7 +355,7 @@ be_menu_select(be_console_t *cons, boot_conf_t *conf, boot_env_t **bepp,
 
 		draw_box(cons);
 
-		be_menu_display_help(cons, conf, help);
+		be_menu_display_help(cons, conf, help, timeout);
 		help = 0;
 
 		if (cur_active > cons_dispay_rows(cons)) {
@@ -342,29 +367,41 @@ be_menu_select(be_console_t *cons, boot_conf_t *conf, boot_env_t **bepp,
 			return (rc);
 		}
 
-		rc = get_key_event();
+		rc = get_key_event(cons, 1);
 		switch (rc) {
 		case ENTER:
 			goto enter;
+		case TIMEOUT:
+			timeout--;
+			if (timeout == 0) {
+				cur_active = def_be;
+				goto enter;
+			}
+			break;
 		case SORT_ORDER:
-			*bepp       = NULL;
-			*sort_order = 1;
+			cons->timeout = timeout = -1;
+			*bepp         = NULL;
+			*sort_order   = 1;
 			goto out;
 		case SORT_KEY:
-			*bepp       = NULL;
-			*sort_key   = 1;
+			cons->timeout = timeout = -1;
+			*bepp         = NULL;
+			*sort_key     = 1;
 			goto out;
 		case SCROLL_UP:
+			cons->timeout = timeout = -1;
 			if (cur_active) {
 				cur_active--;
 			}
 			break;
 		case SCROLL_DOWN:
+			cons->timeout = timeout = -1;
 			if (cur_active < be_count - 1) {
 				cur_active++;
 			}
 			break;
 		case SCROLL_PAGE_UP:
+			cons->timeout = timeout = -1;
 			if (cur_active > cons_dispay_rows(cons)) {
 				cur_active -= cons_dispay_rows(cons);
 			} else {
@@ -372,6 +409,7 @@ be_menu_select(be_console_t *cons, boot_conf_t *conf, boot_env_t **bepp,
 			}
 			break;
 		case SCROLL_PAGE_DOWN:
+			cons->timeout = timeout = -1;
 			if (cur_active + cons_dispay_rows(cons) < be_count - 1) {
 				cur_active += cons_dispay_rows(cons);
 			} else {
@@ -379,13 +417,16 @@ be_menu_select(be_console_t *cons, boot_conf_t *conf, boot_env_t **bepp,
 			}
 			break;
 		case SCROLL_HOME:
-			cur_active = 0;
+			cons->timeout = timeout = -1;
+			cur_active    = 0;
 			break;
 		case SCROLL_END:
-			cur_active = be_count - 1;
+			cons->timeout = timeout = -1;
+			cur_active    = be_count - 1;
 			break;
 		case HELP:
-			help = 1;
+			cons->timeout = timeout = -1;
+			help          = 1;
 			break;
 		}
 	}
@@ -408,12 +449,14 @@ out:
 }
 
 int
-be_console_init(be_console_t *console, int srow, int scol, int nrows, int ncols)
+be_console_init(be_console_t *console, int srow, int scol, int nrows,
+		int ncols, int timeout)
 {
-	console->srow  = srow;
-	console->scol  = scol;
-	console->nrows = nrows;
-	console->ncols = ncols;
+	console->srow    = srow;
+	console->scol    = scol;
+	console->nrows   = nrows;
+	console->ncols   = ncols;
+	console->timeout = timeout;
 
 	return (0);
 }

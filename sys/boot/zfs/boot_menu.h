@@ -12,6 +12,8 @@ typedef struct be_console {
 
 	int cur_row;
 	int cur_col;
+
+	int timeout;
 } be_console_t;
 
 static inline int
@@ -56,6 +58,8 @@ typedef enum {
 	SORT_KEY,
 
 	HELP,
+
+	TIMEOUT,
 } key_event_t;
 
 #define KEY_ENTER      13
@@ -77,6 +81,7 @@ typedef enum {
 
 int be_menu_select(be_console_t *console, boot_conf_t *conf, boot_env_t **bep,
 		int *sort_order, int *sort_key);
-int be_console_init(be_console_t *console, int srow, int scol, int nrows, int ncols);
+int be_console_init(be_console_t *console, int srow, int scol, int nrows,
+		int ncols, int timeout);
 
 #endif

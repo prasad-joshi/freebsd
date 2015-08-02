@@ -2102,11 +2102,9 @@ zfs_mount(const spa_t *spa, uint64_t rootobj, struct zfsmount *mount)
 	/*
 	 * Find the root object set if not explicitly provided
 	 */
-	if (rootobj == 0) {
-		if (zfs_get_root(spa, &rootobj)) {
-			printf("ZFS: can't find root filesystem\n");
-			return (EIO);
-		}
+	if (rootobj == 0 && zfs_get_root(spa, &rootobj)) {
+		printf("ZFS: can't find root filesystem\n");
+		return (EIO);
 	}
 
 	if (zfs_mount_dataset(spa, rootobj, &mount->objset)) {
