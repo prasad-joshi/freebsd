@@ -153,66 +153,6 @@ strdup(const char *s)
 	return p;
 }
 
-#if 0
-#define isspace(c) \
-        ((c) == ' ' || (c) == '\t' || (c) == '\n' || \
-	(c) == '\r' || (c) == '\f' || (c) == '\v')
-
-#define isdigit(c) ((c) >= '0' && (c) <= '9')
-
-static long int
-strtol(const char *nptr, char **endptr, int base)
-{
-	const char *s;
-	char       c;
-	int        neg;
-	long int   rc;
-	int        d;
-
-	s   = nptr;
-	neg = 0;
-
-	while (isspace(*s)) {
-		s++;
-	}
-
-	c = *s;
-	if (c == '-') {
-		neg = 1;
-		s++;
-	} else if (c == '+') {
-		s++;
-	}
-
-	if (base) {
-		base = 10;
-	} else {
-		base = 10;
-	}
-
-	rc = 0;
-	c  = *s;
-	while (c != 0) {
-		if (!isdigit(c)) {
-			break;
-		}
-
-		d  = c - '0';
-		rc = (rc * 10) + d;
-		c  = *++s;
-	}
-
-	if (neg) {
-		rc = -rc;
-	}
-
-	if (endptr != NULL) {
-		*endptr = s;
-	}
-	return (rc);
-}
-#endif
-
 #include "zfsimpl.c"
 #include "boot_menu.c"
 

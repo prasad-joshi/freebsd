@@ -159,7 +159,7 @@ bootenv_string(boot_env_t *be, char *str, uint32_t size)
 		active = '*';
 	}
 
-	snprintf(str, size-1, "%s (%"PRIu64") (%"PRIu64") %c\n", be->path,
+	snprintf(str, size, "%s (%"PRIu64") (%"PRIu64") %c\n", be->path,
 		be->objnum, be->timestamp, active);
 }
 
@@ -180,49 +180,4 @@ bootenv_print(boot_conf_t *conf)
 	TAILQ_FOREACH(b, &conf->head, be_list) {
 		be_print(b);
 	}
-}
-
-int
-bootenv_search_objnum(boot_conf_t *conf, uint64_t objnum, boot_env_t **bepp)
-{
-	boot_env_t *b;
-
-	TAILQ_FOREACH(b, &conf->head, be_list) {
-		if (b->objnum == objnum) {
-			*bepp = b;
-			return (0);
-		}
-	}
-
-	return (-1);
-}
-
-int
-bootenv_search_path(boot_conf_t *conf, const char *path, boot_env_t **bepp)
-{
-	boot_env_t *b;
-
-	TAILQ_FOREACH(b, &conf->head, be_list) {
-		if (strncmp(b->path, path, sizeof(b->path)) == 0) {
-			*bepp = b;
-			return (0);
-		}
-	}
-
-	return (-1);
-}
-
-int
-bootenv_search_timestamp(boot_conf_t *conf, uint64_t timestamp, boot_env_t **bepp)
-{
-	boot_env_t *b;
-
-	TAILQ_FOREACH(b, &conf->head, be_list) {
-		if (b->timestamp == timestamp) {
-			*bepp = b;
-			return (0);
-		}
-	}
-
-	return (-1);
 }
