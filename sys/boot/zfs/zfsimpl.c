@@ -1844,6 +1844,7 @@ static int
 zfs_print(void *unused, const char *name)
 {
 	printf("%s\n", name);
+	return (0);
 }
 
 static int
