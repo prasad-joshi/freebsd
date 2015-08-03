@@ -17,6 +17,41 @@ bootenv_init(boot_conf_t *conf, sort_key_t key, sort_order_t order)
 	return 0;
 }
 
+#if 1
+int
+bootenv_new(const char *name, boot_env_t **bepp)
+{
+	boot_env_t *be;
+	uint32_t   ns;
+
+	be = malloc(sizeof(*be));
+	if (be == NULL) {
+		*bepp = NULL;
+		return (-1);
+	}
+
+	ns = sizeof(be->name);
+	strncpy(be->name, name, ns);
+	be->name[ns - 1] = 0;
+	be->id           = 0;
+	return (0);
+}
+
+void
+bootenv_update(boot_env_t *be, const char *path, uint64_t objnum,
+		uint64_t timestamp, int active)
+{
+	uint32_t ns;
+
+	ns = sizeof(be->path);
+	strncpy(be->path, path, ns);
+	be->path[ns - 1] = 0;
+	
+	be->objnum    = objnum;
+	be->timestamp = timestamp;
+	be->active    = active;
+}
+#else
 int
 bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp, int active,
 		boot_env_t **bepp)
@@ -37,6 +72,7 @@ bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp, int active,
 
 	return (0);
 }
+#endif
 
 static int
 cmp_objnum(boot_env_t *be1, boot_env_t *be2)
@@ -63,9 +99,9 @@ cmp_timestamp(boot_env_t *be1, boot_env_t *be2)
 }
 
 static int
-cmp_name(boot_env_t *be1, boot_env_t *be2)
+cmp_path(boot_env_t *be1, boot_env_t *be2)
 {
-	return (strcmp(be1->name, be2->name));
+	return (strcmp(be1->path, be2->path));
 }
 
 static int
@@ -123,7 +159,7 @@ bootenv_add(boot_conf_t *conf, boot_env_t *be)
 		cmp_fn = cmp_objnum;
 		break;
 	case SORT_NAME:
-		cmp_fn = cmp_name;
+		cmp_fn = cmp_path;
 		break;
 	}
 
@@ -146,7 +182,7 @@ bootenv_string(boot_env_t *be, char *str, uint32_t size)
 		active = '*';
 	}
 
-	snprintf(str, size-1, "%s (%"PRIu64") (%"PRIu64") %c\n", be->name,
+	snprintf(str, size-1, "%s (%"PRIu64") (%"PRIu64") %c\n", be->path,
 		be->objnum, be->timestamp, active);
 }
 
@@ -185,12 +221,12 @@ bootenv_search_objnum(boot_conf_t *conf, uint64_t objnum, boot_env_t **bepp)
 }
 
 int
-bootenv_search_name(boot_conf_t *conf, const char *name, boot_env_t **bepp)
+bootenv_search_path(boot_conf_t *conf, const char *path, boot_env_t **bepp)
 {
 	boot_env_t *b;
 
 	TAILQ_FOREACH(b, &conf->head, be_list) {
-		if (strncmp(b->name, name, sizeof(b->name)) == 0) {
+		if (strncmp(b->path, path, sizeof(b->path)) == 0) {
 			*bepp = b;
 			return (0);
 		}

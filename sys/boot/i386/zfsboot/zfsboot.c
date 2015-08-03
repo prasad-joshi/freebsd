@@ -871,6 +871,12 @@ zfs_mount_ds(char *dsname)
 }
 
 static int
+zfs_print(void *unused, const char *name)
+{
+	printf("%s\n", name);
+}
+
+static int
 parse(void)
 {
     char *arg = cmd;
@@ -921,7 +927,7 @@ parse(void)
 	    dnode_phys_t dn;
 
 	    if (zfs_lookup(&zfsmount, arg, &dn) == 0) {
-		zap_list(spa, &dn);
+		zap_list(spa, &dn, zfs_print, NULL);
 	    }
 	    return -1;
 	} else {

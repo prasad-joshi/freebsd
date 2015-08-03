@@ -1473,6 +1473,7 @@ zap_lookup(const spa_t *spa, const dnode_phys_t *dnode, const char *name, uint64
  * List a microzap directory. Assumes that the zap scratch buffer contains
  * the directory contents.
  */
+#if 0
 static int
 mzap_get_entry(const dnode_phys_t *dnode, int entry, mzap_ent_phys_t **mzepp)
 {
@@ -1491,9 +1492,11 @@ mzap_get_entry(const dnode_phys_t *dnode, int entry, mzap_ent_phys_t **mzepp)
 	*mzepp = &mz->mz_chunk[entry];
 	return (0);
 }
+#endif
 
 static int
-mzap_list(const dnode_phys_t *dnode)
+mzap_list(const dnode_phys_t *dnode,
+	int (*callback) (void *data, const char *name), void *data)
 {
 	const mzap_phys_t *mz;
 	const mzap_ent_phys_t *mze;
@@ -1510,9 +1513,11 @@ mzap_list(const dnode_phys_t *dnode)
 
 	for (i = 0; i < chunks; i++) {
 		mze = &mz->mz_chunk[i];
-		if (mze->mze_name[0])
+		if (mze->mze_name[0]) {
 			//printf("%-32s 0x%jx\n", mze->mze_name, (uintmax_t)mze->mze_value);
-			printf("%s\n", mze->mze_name);
+			// printf("%s\n", mze->mze_name);
+			callback(data, mze->mze_name);
+		}
 	}
 
 	return (0);
@@ -1523,7 +1528,8 @@ mzap_list(const dnode_phys_t *dnode)
  * the directory header.
  */
 static int
-fzap_list(const spa_t *spa, const dnode_phys_t *dnode)
+fzap_list(const spa_t *spa, const dnode_phys_t *dnode,
+	int (*callback)(void *data, const char *name), void *data)
 {
 	int bsize = dnode->dn_datablkszsec << SPA_MINBLOCKSHIFT;
 	zap_phys_t zh = *(zap_phys_t *) zap_scratch;
@@ -1586,7 +1592,8 @@ fzap_list(const spa_t *spa, const dnode_phys_t *dnode)
 			value = fzap_leaf_value(&zl, zc);
 
 			//printf("%s 0x%jx\n", name, (uintmax_t)value);
-			printf("%s\n", name);
+			// printf("%s\n", name);
+			callback(data, name);
 		}
 	}
 
@@ -1611,7 +1618,8 @@ zap_get_type(const spa_t *spa, const dnode_phys_t *dnode, uint64_t *zap_type)
 }
 
 static int
-zap_list(const spa_t *spa, const dnode_phys_t *dnode)
+zap_list(const spa_t *spa, const dnode_phys_t *dnode,
+	int (*callback)(void *data, const char *name), void *data)
 {
 	uint64_t zap_type;
 
@@ -1620,9 +1628,9 @@ zap_list(const spa_t *spa, const dnode_phys_t *dnode)
 	}
 
 	if (zap_type == ZBT_MICRO)
-		return mzap_list(dnode);
+		return mzap_list(dnode, callback, data);
 	else
-		return fzap_list(spa, dnode);
+		return fzap_list(spa, dnode, callback, data);
 }
 
 static int
@@ -1867,6 +1875,12 @@ zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum,
 
 #ifndef BOOT2
 static int
+zfs_print(void *unused, const char *name)
+{
+	printf("%s\n", name);
+}
+
+static int
 zfs_list_dataset(const spa_t *spa, uint64_t objnum/*, int pos, char *entry*/)
 {
 	uint64_t dir_obj, child_dir_zapobj;
@@ -1893,7 +1907,7 @@ zfs_list_dataset(const spa_t *spa, uint64_t objnum/*, int pos, char *entry*/)
 		return (EIO);
 	}
 
-	return (zap_list(spa, &child_dir_zap) != 0);
+	return (zap_list(spa, &child_dir_zap, print_name, NULL) != 0);
 }
 #endif
 
@@ -1925,6 +1939,28 @@ zfs_get_child_zap(const spa_t *spa, uint64_t objnum, dnode_phys_t *zap, uint64_t
 	}
 
 	return (zap_get_type(spa, zap, zap_type));
+}
+
+static int
+zfs_be_add(void *data, const char *name)
+{
+	boot_conf_t *be_conf;
+	int         rc;
+	boot_env_t  *be;
+
+	be_conf = (boot_conf_t *) data;
+
+	rc = bootenv_new(name, &be);
+	if (rc != 0) {
+		return (-1);
+	}
+
+	rc = bootenv_add(be_conf, be);
+	if (rc != 0) {
+		return (-1);
+	}
+
+	return (0);
 }
 
 static int
@@ -1961,6 +1997,38 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 		return (rc);
 	}
 
+	/* find all BEs and add them in a linklist */
+	zap_list(spa, &child_zap, zfs_be_add, be_conf);
+
+	spa_len = strlen(spa->spa_name);
+	snprintf(be_path, sizeof(be_path), "%s/ROOT/", spa->spa_name);
+	rlen = strlen(be_path);
+
+	/* go through list of BEs and update other fields */
+	BOOTENV_FOREACH(be_conf, be) {
+		be_path[rlen] = 0;
+		strncat(be_path, be->name, sizeof(be_path));
+		be_path[sizeof(be_path) - 1] = 0;
+		/*
+		 * Assuming spa_name is zroot and BE name default, be_path will
+		 * now contain string 'zroot/ROOT/default'
+		 */
+
+		timestamp = 0;
+		be_objnum = 0;
+		active    = 0;
+		rc = zfs_lookup_dataset(spa, be->name, &be_objnum, &timestamp);
+		if (rc != 0) {
+			break;
+		}
+
+		if (be_active == be_objnum) {
+			active = 1;
+		}
+
+		bootenv_update(be, be_path, be_objnum, timestamp, active);
+	}
+#if 0
 	spa_len = strlen(spa->spa_name);
 	strncpy(be_path, spa->spa_name, sizeof(be_path));
 	strncat(be_path, "/ROOT/", sizeof(be_path));
@@ -2015,6 +2083,7 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 
 		entry++;
 	}
+#endif
 
 	return (rc);
 }
