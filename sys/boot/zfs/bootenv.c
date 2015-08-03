@@ -17,7 +17,6 @@ bootenv_init(boot_conf_t *conf, sort_key_t key, sort_order_t order)
 	return 0;
 }
 
-#if 1
 int
 bootenv_new(const char *name, boot_env_t **bepp)
 {
@@ -51,28 +50,6 @@ bootenv_update(boot_env_t *be, const char *path, uint64_t objnum,
 	be->timestamp = timestamp;
 	be->active    = active;
 }
-#else
-int
-bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp, int active,
-		boot_env_t **bepp)
-{
-	boot_env_t *be;
-	uint32_t   ns;
-
-	be = malloc(sizeof(*be));
-
-	ns = sizeof(be->name);
-	strncpy(be->name, name, ns);
-	be->name[ns - 1] = 0;
-	be->objnum       = objnum;
-	be->timestamp    = timestamp;
-	be->active       = active;
-	be->id           = 0;
-	*bepp            = be;
-
-	return (0);
-}
-#endif
 
 static int
 cmp_objnum(boot_env_t *be1, boot_env_t *be2)
