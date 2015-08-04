@@ -1494,7 +1494,7 @@ mzap_list(const dnode_phys_t *dnode,
 		mze = &mz->mz_chunk[i];
 		if (mze->mze_name[0]) {
 			//printf("%-32s 0x%jx\n", mze->mze_name, (uintmax_t)mze->mze_value);
-			// printf("%s\n", mze->mze_name);
+			//printf("%s\n", mze->mze_name);
 			callback(data, mze->mze_name);
 		}
 	}
@@ -1839,7 +1839,6 @@ zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum,
 	return (0);
 }
 
-#ifndef BOOT2
 static int
 zfs_print(void *unused, const char *name)
 {
@@ -1847,6 +1846,7 @@ zfs_print(void *unused, const char *name)
 	return (0);
 }
 
+#ifndef BOOT2
 static int
 zfs_list_dataset(const spa_t *spa, uint64_t objnum/*, int pos, char *entry*/)
 {
@@ -1916,7 +1916,6 @@ zfs_be_add(void *data, const char *name)
 	boot_env_t  *be;
 
 	be_conf = (boot_conf_t *) data;
-
 	rc = bootenv_new(name, &be);
 	if (rc != 0) {
 		return (-1);
@@ -1933,20 +1932,18 @@ zfs_be_add(void *data, const char *name)
 static int
 zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 {
-	uint64_t        be_active; /* object number of active be */
-	uint64_t        objnum;
-	int             rc;
-	dnode_phys_t    child_zap;
-	char            be_path[ZFS_MAXNAMELEN];
-	int             spa_len;
-	int             rlen;
-	mzap_ent_phys_t *mze;
-	int             entry;
-	char            *d;
-	uint64_t        be_objnum;
-	int             active;
-	uint64_t        timestamp;
-	boot_env_t      *be;
+	uint64_t     be_active; /* object number of active be */
+	uint64_t     objnum;
+	int          rc;
+	dnode_phys_t child_zap;
+	char         be_path[ZFS_MAXNAMELEN];
+	int          spa_len;
+	int          rlen;
+	char         *d;
+	uint64_t     be_objnum;
+	int          active;
+	uint64_t     timestamp;
+	boot_env_t   *be;
 
 	rc = zfs_get_root(spa, &be_active);
 	if (rc != 0) {
@@ -1964,7 +1961,7 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 	}
 
 	/* find all BEs and add them in a linklist */
-	zap_list(spa, &child_zap, zfs_be_add, be_conf);
+	zap_list(spa, &child_zap, zfs_be_add, (void *) be_conf);
 
 	spa_len = strlen(spa->spa_name);
 	snprintf(be_path, sizeof(be_path), "%s/ROOT/", spa->spa_name);
@@ -1983,7 +1980,8 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 		timestamp = 0;
 		be_objnum = 0;
 		active    = 0;
-		rc = zfs_lookup_dataset(spa, be->name, &be_objnum, &timestamp);
+		d         = &be_path[spa_len + 1];
+		rc        = zfs_lookup_dataset(spa, d, &be_objnum, &timestamp);
 		if (rc != 0) {
 			break;
 		}

@@ -20,7 +20,6 @@ typedef enum {
 typedef struct boot_env {
 	TAILQ_ENTRY(boot_env) be_list;
 	char                  name[ZFS_MAXNAMELEN];
-	char                  path[ZFS_MAXNAMELEN];
 	uint64_t              objnum;
 	uint64_t              timestamp;
 	uint32_t              id;

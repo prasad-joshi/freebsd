@@ -469,7 +469,7 @@ boot_autoboot(spa_t *spa)
     }
 
     heap_saved = heap_next;
-    cur_key    = SORT_TIMESTAMP;
+    cur_key    = SORT_NAME;
     cur_order  = SORT_ASCENDING;
     for (;;) {
         /*
@@ -808,12 +808,6 @@ zfs_mount_ds(char *dsname)
     }
     spa = newspa;
     return (0);
-}
-
-static int
-zfs_print(void *unused, const char *name)
-{
-	printf("%s\n", name);
 }
 
 static int
