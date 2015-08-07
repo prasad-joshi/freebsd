@@ -31,12 +31,14 @@ typedef struct boot_conf {
 	sort_key_t             key;
 	sort_order_t           order;
 	uint32_t               count;
+	void                   *spa;
+	char                   *root;
+	uint64_t               be_active;
 } boot_conf_t;
 
 int bootenv_init(boot_conf_t *conf, sort_key_t key, sort_order_t order);
-int bootenv_new(const char *name, boot_env_t **be);
-void bootenv_update(boot_env_t *be, const char *be_path, uint64_t objnum,
-		uint64_t timestamp, int active);
+int bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp,
+		int active, boot_env_t **bepp);
 int bootenv_add(boot_conf_t *conf, boot_env_t *be);
 void bootenv_print(boot_conf_t *conf);
 void bootenv_string(boot_env_t *be, char *str, uint32_t size);

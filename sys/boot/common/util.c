@@ -114,7 +114,6 @@ strlen(const char *s)
 	return (len);
 }
 
-#if 0
 void
 printf(const char *fmt, ...)
 {
@@ -175,4 +174,3 @@ nextfmt:
 	}
 	va_end(ap);
 }
-#endif

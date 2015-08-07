@@ -5,6 +5,7 @@ INTERNALLIB=
 
 SRCS+=		zfs.c
 SRCS+=		bootenv.c
+SRCS+=		boot_menu.c
 
 CFLAGS+=	-DBOOTPROG=\"zfsloader\"
 CFLAGS+=	-I${.CURDIR}/../common -I${.CURDIR}/../.. -I.

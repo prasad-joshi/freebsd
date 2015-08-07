@@ -10,15 +10,17 @@ typedef int (*becmp_t) (boot_env_t *be1, boot_env_t *be2);
 int
 bootenv_init(boot_conf_t *conf, sort_key_t key, sort_order_t order)
 {
+	memset(conf, 0, sizeof(*conf));
 	TAILQ_INIT(&conf->head);
 	conf->key   = key;
 	conf->order = order;
 	conf->count = 0;
-	return 0;
+	return (0);
 }
 
 int
-bootenv_new(const char *name, boot_env_t **bepp)
+bootenv_new(const char *name, uint64_t objnum, uint64_t timestamp,
+		int active, boot_env_t **bepp)
 {
 	boot_env_t *be;
 	uint32_t   ns;
@@ -34,23 +36,11 @@ bootenv_new(const char *name, boot_env_t **bepp)
 	strncpy(be->name, name, ns);
 	be->name[ns - 1] = 0;
 	be->id           = 0;
+	be->objnum       = objnum;
+	be->timestamp    = timestamp;
+	be->active       = active;
 	*bepp            = be;
 	return (0);
-}
-
-void
-bootenv_update(boot_env_t *be, const char *path, uint64_t objnum,
-		uint64_t timestamp, int active)
-{
-	uint32_t ns;
-
-	ns = sizeof(be->name);
-	strncpy(be->name, path, ns);
-	be->name[ns - 1] = 0;
-	
-	be->objnum    = objnum;
-	be->timestamp = timestamp;
-	be->active    = active;
 }
 
 static int
@@ -161,8 +151,8 @@ bootenv_string(boot_env_t *be, char *str, uint32_t size)
 		active = '*';
 	}
 
-	snprintf(str, size, "%s (%"PRIu64") (%"PRIu64") %c\n", be->name,
-		be->objnum, be->timestamp, active);
+	strncpy(str, be->name, size);
+	str[size - 1] = 0;
 }
 
 static void

@@ -1874,7 +1874,7 @@ zfs_list_dataset(const spa_t *spa, uint64_t objnum/*, int pos, char *entry*/)
 		return (EIO);
 	}
 
-	return (zap_list(spa, &child_dir_zap, print_name, NULL) != 0);
+	return (zap_list(spa, &child_dir_zap, zfs_print, NULL) != 0);
 }
 #endif
 
@@ -1912,11 +1912,59 @@ static int
 zfs_be_add(void *data, const char *name)
 {
 	boot_conf_t *be_conf;
-	int         rc;
+	spa_t       *spa;
 	boot_env_t  *be;
+	uint32_t    sz;
+	char        be_path[ZFS_MAXNAMELEN];
+	int         spa_len;
+	int         rlen;
+	char        *d;
+	uint64_t    be_objnum;
+	int         active;
+	uint64_t    timestamp;
+	int         rc;
 
 	be_conf = (boot_conf_t *) data;
-	rc = bootenv_new(name, &be);
+	spa     = (spa_t *) be_conf->spa;
+	be      = NULL;
+
+	/*
+	 * prepare be_path. Assuming boot BE path to be used to set mountfrom
+	 * env variable. Assuming spa_name is zroot, bootenv as ROOT, and
+	 * bename default. The be_path variable would contain string
+	 * "zroot/ROOT/default"
+	 */
+	sz = sizeof(be_path);
+	memset(be_path, 0, sz);
+	strncpy(be_path, spa->spa_name, sz);
+
+	spa_len = strlen(spa->spa_name);
+	sz      = sizeof(be_path) - strlen(be_path);
+
+	strncat(be_path, "/", sz);
+	sz = sizeof(be_path) - strlen(be_path);
+	strncat(be_path, be_conf->root, sz);
+	sz = sizeof(be_path) - strlen(be_path);
+	strncat(be_path, "/", sz);
+	sz = sizeof(be_path) - strlen(be_path);
+	rlen = strlen(be_path);
+	strncat(be_path, name, sz);
+	be_path[sizeof(be_path) - 1] = 0;
+
+	timestamp = 0;
+	be_objnum = 0;
+	active    = 0;
+	d         = &be_path[spa_len + 1];
+	rc        = zfs_lookup_dataset(spa, d, &be_objnum, &timestamp);
+	if (rc != 0) {
+		return (-1);
+	}
+
+	if (be_conf->be_active == be_objnum) {
+		active = 1;
+	}
+
+	rc = bootenv_new(be_path, be_objnum, timestamp, active, &be);
 	if (rc != 0) {
 		return (-1);
 	}
@@ -1932,25 +1980,11 @@ zfs_be_add(void *data, const char *name)
 static int
 zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 {
-	uint64_t     be_active; /* object number of active be */
 	uint64_t     objnum;
 	int          rc;
 	dnode_phys_t child_zap;
-	char         be_path[ZFS_MAXNAMELEN];
-	int          spa_len;
-	int          rlen;
-	char         *d;
-	uint64_t     be_objnum;
-	int          active;
-	uint64_t     timestamp;
-	boot_env_t   *be;
 
-	rc = zfs_get_root(spa, &be_active);
-	if (rc != 0) {
-		return (rc);
-	}
-
-	rc = zfs_lookup_dataset(spa, "ROOT", &objnum, NULL);
+	rc = zfs_lookup_dataset(spa, be_conf->root, &objnum, NULL);
 	if (rc != 0) {
 		return (rc);
 	}
@@ -1962,36 +1996,6 @@ zfs_get_bes(const spa_t *spa, boot_conf_t *be_conf)
 
 	/* find all BEs and add them in a linklist */
 	zap_list(spa, &child_zap, zfs_be_add, (void *) be_conf);
-
-	spa_len = strlen(spa->spa_name);
-	snprintf(be_path, sizeof(be_path), "%s/ROOT/", spa->spa_name);
-	rlen = strlen(be_path);
-
-	/* go through list of BEs and update other fields */
-	BOOTENV_FOREACH(be_conf, be) {
-		be_path[rlen] = 0;
-		strncat(be_path, be->name, sizeof(be_path));
-		be_path[sizeof(be_path) - 1] = 0;
-		/*
-		 * Assuming spa_name is zroot and BE name default, be_path will
-		 * now contain string 'zroot/ROOT/default'
-		 */
-
-		timestamp = 0;
-		be_objnum = 0;
-		active    = 0;
-		d         = &be_path[spa_len + 1];
-		rc        = zfs_lookup_dataset(spa, d, &be_objnum, &timestamp);
-		if (rc != 0) {
-			break;
-		}
-
-		if (be_active == be_objnum) {
-			active = 1;
-		}
-
-		bootenv_update(be, be_path, be_objnum, timestamp, active);
-	}
 
 	return (0);
 }

@@ -442,17 +442,31 @@ trymbr:
 static void
 setup_mountfrom(void)
 {
+	uint32_t sz;
+
 	zfs_rlookup(spa, zfsmount.rootobj, rootname);
 
 	/* setup mountfrom string */
-	snprintf(mountfrom, sizeof(mountfrom), "zfs:%s/%s", spa->spa_name,
-			rootname);
+	sz = sizeof(mountfrom);
+	memset(mountfrom, 0, sz);
+	strncpy(mountfrom, "zfs:", sz);
+
+	sz = sizeof(mountfrom) - strlen(mountfrom);
+	strncat(mountfrom, spa->spa_name, sz);
+
+	sz = sizeof(mountfrom) - strlen(mountfrom);
+	strncat(mountfrom, "/", sz);
+
+	sz = sizeof(mountfrom) - strlen(mountfrom);
+	strncat(mountfrom, rootname, sz);
 }
 
 static void
 boot_autoboot(spa_t *spa)
 {
     be_console_t console;
+    uint8_t      failed;
+    uint64_t     be_active;
     int          cur_key;
     int          cur_order;
     uint64_t     rootobj;
@@ -462,9 +476,20 @@ boot_autoboot(spa_t *spa)
     int          order;
     int          key;
 
+    failed = 0;
+    rc = zfs_get_root(spa, &be_active);
+    if (rc != 0) {
+        printf("Failed to get active BE object number\n");
+        failed = 1;
+    }
+
     rc = be_console_init(&console, 2, 5, 10, MAX_COLS - 5, 5);
     if (rc < 0) {
         printf("Initializing console failed.\n");
+        failed = 1;
+    }
+
+    if (failed == 1) {
         for (;;);
     }
 
@@ -478,9 +503,18 @@ boot_autoboot(spa_t *spa)
          */
         heap_next = heap_saved;
         rootobj   = 0;
+
         rc = bootenv_init(&be_conf, cur_key, cur_order);
         if (rc < 0) {
             printf("Initializing bootenv list failed.\n");
+            for (;;);
+        }
+
+        be_conf.spa       = spa;
+        be_conf.be_active = be_active;
+        be_conf.root      = strdup("ROOT");
+        if (be_conf.root == NULL) {
+            printf("Memory allocation failed.\n");
             for (;;);
         }
 

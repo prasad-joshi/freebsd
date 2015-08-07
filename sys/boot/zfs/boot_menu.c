@@ -244,6 +244,7 @@ be_menu_display_help(be_console_t *cons, boot_conf_t *conf, int help, int timeou
 	int             r;
 	int             c;
 	char            msg[128];
+	char            d[3];
 	uint32_t        sz;
 	uint32_t        s;
 	struct help_msg *h;
@@ -294,8 +295,15 @@ be_menu_display_help(be_console_t *cons, boot_conf_t *conf, int help, int timeou
 	erase(cons);
 	if (cons->timeout >= 0) {
 		memset(msg, 0, sizeof(msg));
-		snprintf(msg, sizeof(msg),
-			"Booting default BE in %d seconds\n", timeout);
+		strncpy(msg, "Booting default BE in ", sizeof(msg));
+		sz = sizeof(msg) - strlen(msg);
+
+		d[0] = '0' + timeout;
+		d[1] = 0;
+		strncat(msg, d, sz);
+		sz--;
+
+		strncat(msg, " seconds", sz);
 		print_msg(cons, msg, strlen(msg));
 	}
 
