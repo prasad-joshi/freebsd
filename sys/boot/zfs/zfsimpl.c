@@ -1833,7 +1833,7 @@ zfs_lookup_dataset(const spa_t *spa, const char *name, uint64_t *objnum,
 	}
 
 	*objnum = dd->dd_head_dataset_obj;
-	if (timestamp != (void *) 0) {
+	if (timestamp != NULL) {
 		*timestamp = dd->dd_creation_time;
 	}
 	return (0);
