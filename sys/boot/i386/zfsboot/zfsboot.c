@@ -444,6 +444,7 @@ setup_mountfrom(void)
 {
 	uint32_t sz;
 
+	memset(rootname, 0, sizeof(rootname));
 	zfs_rlookup(spa, zfsmount.rootobj, rootname);
 
 	/* setup mountfrom string */
@@ -467,6 +468,7 @@ boot_autoboot(spa_t *spa)
     be_console_t console;
     uint8_t      failed;
     uint64_t     be_active;
+    char         *r;
     int          cur_key;
     int          cur_order;
     uint64_t     rootobj;
@@ -481,6 +483,22 @@ boot_autoboot(spa_t *spa)
     if (rc != 0) {
         printf("Failed to get active BE object number\n");
         failed = 1;
+    }
+
+    memset(rootname, 0, sizeof(rootname));
+    rc = zfs_rlookup(spa, be_active, rootname);
+    if (rc != 0) {
+        printf("Failed to map be object number to name\n");
+        failed = 1;
+    }
+
+    /* find bootenv of active BE */
+    r = strchr(rootname, '/');
+    if (r != NULL) {
+        *r = 0;
+        r  = rootname;
+    } else {
+        r  = " ";
     }
 
     rc = be_console_init(&console, 2, 5, 10, MAX_COLS - 5, 5);
@@ -512,7 +530,7 @@ boot_autoboot(spa_t *spa)
 
         be_conf.spa       = spa;
         be_conf.be_active = be_active;
-        be_conf.root      = strdup("ROOT");
+        be_conf.root      = strdup(r);
         if (be_conf.root == NULL) {
             printf("Memory allocation failed.\n");
             for (;;);
@@ -666,6 +684,7 @@ main(void)
         for (;;) {
             if (!autoboot || !OPT_CHECK(RBX_QUIET)) {
                 printf("\nFreeBSD/x86 boot\n");
+                memset(rootname, 0, sizeof(rootname));
                 if (zfs_rlookup(spa, zfsmount.rootobj, rootname) != 0)
                     printf("Default: %s/<0x%llx>:%s\n"
                             "boot: ",
